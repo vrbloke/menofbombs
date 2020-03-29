@@ -25,17 +25,17 @@ colors_old = ["Empty", (100, 100, 100), (120, 100, 100),
           (255, 255, 255), (100, 0, 0), (100, 100, 0),
           (0, 0, 100), (0, 100, 0), (0, 0, 200),
           (0, 200, 0), (100, 100, 255), (100, 255, 100)]
-colors = [pygame.image.load("wall.png"), pygame.image.load("wall.png"), pygame.image.load("wall.png"),
-          pygame.image.load("ghostfruit.png"), pygame.image.load("bomb.png"), pygame.image.load("explosion.png"),
-          pygame.image.load("player1ghost.png"), pygame.image.load("player2ghost.png"), pygame.image.load("player1.png"),
-          pygame.image.load("player2.png"), pygame.image.load("player1emp.png"), pygame.image.load("player2emp.png")]
+colors = [pygame.image.load("sprites/wall.png"), pygame.image.load("sprites/wall.png"), pygame.image.load("sprites/wall.png"),
+          pygame.image.load("sprites/ghostfruit.png"), pygame.image.load("sprites/bomb.png"), pygame.image.load("sprites/explosion.png"),
+          pygame.image.load("sprites/player1ghost.png"), pygame.image.load("sprites/player2ghost.png"), pygame.image.load("sprites/player1.png"),
+          pygame.image.load("sprites/player2.png"), pygame.image.load("sprites/player1emp.png"), pygame.image.load("sprites/player2emp.png")]
 for sprite in colors:
     sprite.set_colorkey((0, 0, 0))
 # 0: nothing 1: wall 2: hardwall
 # 3: ghostfruit 4: bomb 5: explosion
 # 6: p1 ghost 7: p2 ghost 8: p1
 # 9: p2  10: p1 emp 11: p2 emp
-background = pygame.image.load("background.png")
+background = pygame.image.load("sprites/background.png")
 background_old = (0, 0, 0)
 
 # BOARD

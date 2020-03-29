@@ -11,11 +11,6 @@ The deceased can move through walls
 Game ends when both players are deceased or the deceased is hit by an exorcist bomb 
 '''
 
-'''
-TODO:
-Primary goal: Make system for translating arrays into 16x16 square graphics
-'''
-
 # FUNCTIONS
 def random_coords():
     return (random.choice(range(1, board_size, 2)), random.choice(range(1, board_size, 2)))

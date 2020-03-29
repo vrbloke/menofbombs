@@ -105,21 +105,21 @@ while running:
             if event.key == pygame.K_l:
                 player_two.place_bomb()
         if event.type == pygame.KEYUP:
-            if event.key == pygame.K_w:
+            if event.key == pygame.K_w and player_one.velocity == 1:
                 player_one.change_velocity(0)
-            if event.key == pygame.K_d:
+            if event.key == pygame.K_d and player_one.velocity == 2:
                 player_one.change_velocity(0)
-            if event.key == pygame.K_s:
+            if event.key == pygame.K_s and player_one.velocity == 3:
                 player_one.change_velocity(0)
-            if event.key == pygame.K_a:
+            if event.key == pygame.K_a and player_one.velocity == 4:
                 player_one.change_velocity(0)
-            if event.key == pygame.K_UP:
+            if event.key == pygame.K_UP and player_two.velocity == 1:
                 player_two.change_velocity(0)
-            if event.key == pygame.K_RIGHT:
+            if event.key == pygame.K_RIGHT and player_two.velocity == 2:
                 player_two.change_velocity(0)
-            if event.key == pygame.K_DOWN:
+            if event.key == pygame.K_DOWN and player_two.velocity == 3:
                 player_two.change_velocity(0)
-            if event.key == pygame.K_LEFT:
+            if event.key == pygame.K_LEFT and player_two.velocity == 4:
                 player_two.change_velocity(0)
 
     if step_counter % 10 == 0:

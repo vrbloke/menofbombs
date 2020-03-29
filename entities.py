@@ -94,9 +94,11 @@ class Player():
     def explosion_square(self, side):
         startx = self.bombpos[0] - int(side/2)
         starty = self.bombpos[1] - int(side/2)
+        board_size = len(self.board[0])
         for i in range(side + 1):
             for j in range(side + 1):
-                self.explosion_tiles.append((startx + i, starty + j))
+                if startx + i > 0 and startx + i < board_size and starty + j > 0 and starty + j < board_size:
+                    self.explosion_tiles.append((startx + i, starty + j))
 
     def explode(self):
         if self.number < 10:

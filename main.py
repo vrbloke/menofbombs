@@ -1,5 +1,8 @@
-import pygame, random, timeit
-import entities, display
+from random import seed as randseed
+
+import pygame as pg
+from display import Tile, Board, Window
+import entities
 
 '''
 Man of Bombs: Ghost Trick game:
@@ -11,173 +14,89 @@ The deceased can move through walls
 Game ends when both players are deceased or the deceased is hit by an exorcist bomb 
 '''
 
-# FUNCTIONS
-def random_coords():
-    return (random.choice(range(1, board_size, 2)), random.choice(range(1, board_size, 2)))
+"""
+Pro tips by virtuNat:
+1. You can make life easier for you by using from import syntax and aliasing.
+2. pygame.display.set_mode needs to only be called exactly once.
+3. Even if you lose the screen reference, you can get it back using pygame.display.get_surface.
+4. All pygame.Surface related processing should happen after the display mode is set.
+5. pygame.time.Clock is your friend for doing frame delays.
+6. If certain logic does not need to happen every frame, don't make it happen every frame.
+7. You do not have to redraw the entire screen every frame.
+8. It is much better to consolidate all related sprites into a single atlas image file and use the
+third argument of pygame.Surface.blit to just decide which portion will be blitted to a surface than
+to have dozens of separate tiny image files in a textures folder.
+9. Instead of hardcoding related keys in long if-elif-else chains, have a table that lets you run
+what you need for each set of keys.
+10. The main running loop should be in a function to avoid running your game when importing for
+compilation into an executable.
+"""
 
-# CONSTANTS
-board_size = 17  # Must be uneven
-square_size = 32
-version = 0.1
+__version__ = "0.2 alpha"
+__author__ = "vR"
 
-# SPRITES
-colors_old = ["Empty", (100, 100, 100), (120, 100, 100),
-          (255, 255, 255), (100, 0, 0), (100, 100, 0),
-          (0, 0, 100), (0, 100, 0), (0, 0, 200),
-          (0, 200, 0), (100, 100, 255), (100, 255, 100)]
-colors = [pygame.image.load("sprites/wall.png"), pygame.image.load("sprites/wall.png"), pygame.image.load("sprites/wall.png"),
-          pygame.image.load("sprites/ghostfruit.png"), pygame.image.load("sprites/bomb.png"), pygame.image.load("sprites/explosion.png"),
-          pygame.image.load("sprites/player1ghost.png"), pygame.image.load("sprites/player2ghost.png"), pygame.image.load("sprites/player1.png"),
-          pygame.image.load("sprites/player2.png"), pygame.image.load("sprites/player1emp.png"), pygame.image.load("sprites/player2emp.png")]
-for sprite in colors:
-    sprite.set_colorkey((0, 0, 0))
-# 0: nothing 1: wall 2: hardwall
-# 3: ghostfruit 4: bomb 5: explosion
-# 6: p1 ghost 7: p2 ghost 8: p1
-# 9: p2  10: p1 emp 11: p2 emp
-background = pygame.image.load("sprites/background.png")
-background_old = (0, 0, 0)
+def play_game():
+    # CONSTANTS
+    board_size = 8*2 + 1  # Must be odd number (2n + 1)
+    square_size = 32
 
-# BOARD
-board = []  # Holds entities represented by a number. The index is location.
-for i in range(board_size):
-    new_row = []
-    for j in range(board_size):
-        new_row.append(0)
-    board.append(new_row)
+    # INIT STUFF
+    pg.init()
+    pg.display.set_caption(f"Men of Bombs: Ghost Trick v{version}")
+    screen = pg.display.set_mode((board_size * square_size, board_size * (square_size + 3)), pg.HWSURFACE | pg.DOUBLEBUF)
 
-# Edges of board wall. Odd numbered tiles also wall.
-for i in range(board_size):
-    for j in range(board_size):
-        if i == 0 or j == 0 or i == board_size - 1 or j == board_size - 1:
-            board[i][j] = 2
-        elif i % 2 == 0 and j % 2 == 0:
-            board[i][j] = 1
-        else:
-            board[i][j] = 0
+    background = pg.image.load("sprites/background.png").convert()
+    Tile.atlas = pg.image.load("sprites/spriteatlas.png").convert()
+    Tile.atlas.set_colorkey((0, 0, 0))
 
-# TEXT CONTAINER
-text = "Player 1"
+    board = Board(board_size)
+    screen = Window(screen, board, background)
+    clock = pg.time.Clock()
+    randseed()
 
-# INIT STUFF
-pygame.init()
-pygame.display.set_caption(f"Men of Bombs: Ghost Trick v{version}")
-gamescreen = display.SpriteDisplay(board, colors, text, background, board_size, square_size)
-gamescreen.initialize()
-random.seed()
+    # CREATE ACTORS & VARIABLES
+    p1 = entities.Player([3, 3], board, 8)
+    p2 = entities.Player([7, 7], board, 9)
+    players = (p1, p2)
+    frame = 0
 
-# CREATE ACTORS & VARIABLES
-player_one = entities.Player([3, 3], board, 8)
-player_two = entities.Player([7,7], board, 9)
-players = [player_one, player_two]
-step_counter = 10
-clean_board = [x.copy() for x in board]
-fruit_present = False
-fruitx = 0
-fruity = 0
+    config1 = {pg.K_w: 1, pg.K_d: 2, pg.K_s: 3, pg.K_a: 4}
+    config2 = {pg.K_UP: 1, pg.K_RIGHT: 2, pg.K_DOWN: 3, pg.K_LEFT: 4}
 
-# GAME LOOP
-running = True
-while running:
-    timer_start = timeit.default_timer()
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_w:
-                player_one.change_velocity(1)
-            if event.key == pygame.K_d:
-                player_one.change_velocity(2)
-            if event.key == pygame.K_s:
-                player_one.change_velocity(3)
-            if event.key == pygame.K_a:
-                player_one.change_velocity(4)
-            if event.key == pygame.K_e:
-                player_one.place_bomb()
-            if event.key == pygame.K_UP:
-                player_two.change_velocity(1)
-            if event.key == pygame.K_RIGHT:
-                player_two.change_velocity(2)
-            if event.key == pygame.K_DOWN:
-                player_two.change_velocity(3)
-            if event.key == pygame.K_LEFT:
-                player_two.change_velocity(4)
-            if event.key == pygame.K_l:
-                player_two.place_bomb()
-        if event.type == pygame.KEYUP:
-            if event.key == pygame.K_w and player_one.velocity == 1:
-                player_one.change_velocity(0)
-            if event.key == pygame.K_d and player_one.velocity == 2:
-                player_one.change_velocity(0)
-            if event.key == pygame.K_s and player_one.velocity == 3:
-                player_one.change_velocity(0)
-            if event.key == pygame.K_a and player_one.velocity == 4:
-                player_one.change_velocity(0)
-            if event.key == pygame.K_UP and player_two.velocity == 1:
-                player_two.change_velocity(0)
-            if event.key == pygame.K_RIGHT and player_two.velocity == 2:
-                player_two.change_velocity(0)
-            if event.key == pygame.K_DOWN and player_two.velocity == 3:
-                player_two.change_velocity(0)
-            if event.key == pygame.K_LEFT and player_two.velocity == 4:
-                player_two.change_velocity(0)
-
-    if step_counter % 10 == 0:
-
-        # Reset board to neutral state
-        for row, clean_row in zip(board, clean_board):
-            row[:] = clean_row
-
-        # Resolve bomb men
-        for player in players:
-
-            # Movement
-            player.move()
-
-            # Bombs
-            player.bomb_update()
-
-        for player in players:
-            board[player.pos[0]][player.pos[1]] = player.number
-
-        for player in players:
-            if player.bomb_placed:
-                board[player.bombpos[0]][player.bombpos[1]] = 4
-            if player.explosion:
-                for pos in player.explosion_tiles:
-                    board[pos[0]][pos[1]] = 5
-
-        if fruit_present:
-            if board[fruitx][fruity] == 5:  # Move fruit if it is exploded so players cant just permablock it by explosions
-                fruitx, fruity = random_coords()
-            board[fruitx][fruity] = 3
-
-        for player in players:
-            # Deaths, fruits & power
-            x = players.copy()
-            x.remove(player)
-            if board[player.pos[0]][player.pos[1]] == 5: # Player caught in explosion
-                player.downgrade()
-                fruitx, fruity = random_coords()
-                fruit_present = True
-                for t in x:
-                    t.upgrade()
-            if player.number < 6:  # Player double killed
+    # GAME LOOP
+    running = True
+    while running:
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
                 running = False
-            if player.pos[0] == fruitx and player.pos[1] == fruity and player.number < 8:  # Player reached ghostfruit
-                player.upgrade()
-                fruit_present = False
-                for t in x:
-                    t.downgrade()
+            elif event.type == pg.KEYDOWN:
+                if event.key in config1:
+                    p1.movdir = config1[event.key]
+                elif event.key == pg.K_e:
+                    p1.place_bomb()
+                elif event.key in config2:
+                    p2.movdir = config2[event.key]
+                elif event.key == pg.K_l:
+                    p2.place_bomb()
+            elif event.type == pg.KEYUP:
+                if p1.movdir and event.key in config1:
+                    p1.movdir = 0
+                elif p2.movdir and event.key in config2:
+                    p2.movdir = 0
 
-        # Reset counter
-        step_counter = 0
+        if frame == 0:
+            # Resolve bomb men
+            if p1.bomb: p1.bomb.update()
+            if p2.bomb: p2.bomb.update()
+            if p1.update(p2):
+                running = False
+            if p2.update(p1):
+                running = False
 
-    # Render board
-    gamescreen.update()
+        # Wait for framerate & update counter & board
+        screen.update()
+        clock.tick(60)
+        frame = (frame + 1) % 10
 
-    # Wait for framerate & update counter
-    timer_end = 0
-    while timer_end - timer_start < 1/60:
-        timer_end = timeit.default_timer()
-    step_counter += 1
+if __name__ == '__main__':
+    play_game()

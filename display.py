@@ -12,6 +12,13 @@ Pro tips by virtuNat:
 6. Annotations are not necessary but help a lot in keeping track of what things are.
 """
 
+TILE_EMPTY = 0
+TILE_SWALL = 1
+TILE_HWALL = 2
+TILE_FRUIT = 3
+TILE_BOMB = 4
+TILE_BOOM = 5
+
 class Tile(pg.sprite.Sprite):
     """Sprite tile on the board. Each tile is its own sprite."""
     __slots__ = ('image', 'rect', 'clip')
@@ -21,7 +28,10 @@ class Tile(pg.sprite.Sprite):
         super().__init__()
         self.image = self.atlas
         self.rect = pg.Rect(x*size, y*size, size, size)
-        self.clip = self.rect.copy()
+        self.clip = pg.Rect(0, 0, size, size)
+
+    def __repr__(self) -> str:
+        return f'Tile({self.rect.w}, {self.rect.x//self.rect.w}, {self.rect.y//self.rect.h})'
 
     def get_pos(self) -> Tuple[int, int]:
         return (self.rect.x // self.rect.w, self.rect.y // self.rect.h)
@@ -42,12 +52,12 @@ class Board(pg.sprite.Group):
     Not the smartest idea to hold a literal grid of sprites but it's something.
     """
 
-    def __init__(self, size: int) -> None:
-        super.__init__()
+    def __init__(self, bsize: int, ssize: int) -> None:
+        super().__init__()
         self._tiles = {
-            (x, y): Tile(size, x, y) for y in range(size) for x in range(size)
+            (x, y): Tile(ssize, x, y) for y in range(bsize) for x in range(bsize)
             }
-        self.size = size
+        self.size = bsize
         self.add(self._tiles.values())
         self.reset()
 
@@ -61,15 +71,20 @@ class Board(pg.sprite.Group):
         for y in range(self.size):
             for x in range(self.size):
                 if x == 0 or x == self.size-1 or y == 0 or y == self.size-1:
-                    self._tiles[x, y].set_tile(2)
+                    self._tiles[x, y].set_tile(TILE_HWALL)
                 elif x & 1 or y & 1:
-                    self._tiles[x, y].set_tile(0)
+                    self._tiles[x, y].set_tile(TILE_EMPTY)
                 else:
-                    self._tiles[x, y].set_tile(1)
+                    self._tiles[x, y].set_tile(TILE_SWALL)
 
     def spawn_fruit(self) -> None:
-        sprites = [sprite for sprite in self if sprite.get_tile() == 0]
-        choice(sprites).set_tile(3)
+        sprites = [sprite for sprite in self if sprite.get_tile() == TILE_EMPTY]
+        choice(sprites).set_tile(TILE_FRUIT)
+
+    def clear_debris(self) -> None:
+        for sprite in self._tiles.values():
+            if sprite.get_tile() == TILE_BOOM:
+                sprite.set_tile(TILE_EMPTY)
 
     def draw(self, dest: pg.Surface) -> None:
         # This gets pretty horrendously slow pretty fucking quick.

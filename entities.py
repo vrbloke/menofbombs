@@ -1,4 +1,5 @@
 import pygame as pg
+import display
 
 """
 Pro tips by virtuNat:
@@ -8,6 +9,8 @@ Pro tips by virtuNat:
 4. Try to imagine potential edge cases and undefined behavior in your head when implementing methods. If they can be achieved
 over the course of execution, deal with them.
 """
+
+wall_tiles = (display.TILE_SWALL, display.TILE_HWALL, display.TILE_BOMB)
 
 class Bomb(pg.sprite.Sprite):
     """The players' bombs."""
@@ -22,16 +25,20 @@ class Bomb(pg.sprite.Sprite):
         self.respawn_fruit = False
 
     def explode_cross(self, reach):
-        for dx, dy in ((0, 1) (1, 0), (0, -1), (-1, 0)):
-            for i in range(reach + 1):
-                tile = self.board[self.pos[0]+dx, self.pos[1]+dy]
+        for dx, dy in ((0, 1), (1, 0), (0, -1), (-1, 0)):
+            for i in range(1, reach + 1):
+                try:
+                    tile = self.board[self.pos[0]+dx*i, self.pos[1]+dy*i]
+                except KeyError:
+                    break
                 tile_type = tile.get_tile()
-                if tile_type not in (1, 2, 4):
-                    tile.set_tile(5)
-                    if tile_type == 3:
+                if tile_type not in wall_tiles:
+                    tile.set_tile(display.TILE_BOOM)
+                    if tile_type == display.TILE_FRUIT:
                         self.respawn_fruit = True
                 elif not self.power:
                     break
+        self.board[self.pos].set_tile(5)
     
     def explode_square(self):
         for dy in range(-self.reach//2, self.reach//2 + 1):
@@ -41,9 +48,9 @@ class Bomb(pg.sprite.Sprite):
                 except KeyError:
                     continue
                 tile_type = tile.get_tile()
-                if tile_type not in (1, 2, 4):
-                    tile.set_tile(5)
-                    if tile_type == 3:
+                if tile_type not in wall_tiles:
+                    tile.set_tile(display.TILE_BOOM)
+                    if tile_type == display.TILE_FRUIT:
                         self.respawn_fruit = True
 
     def explode(self):
@@ -58,9 +65,7 @@ class Bomb(pg.sprite.Sprite):
     def update(self):
         if self.timer == 1:
             self.explode()
-        else:
-            self.board[self.pos].set_tile(4)
-        self.timer = min(0, self.timer - 1)
+        self.timer = max(-2, self.timer - 1)
 
 
 class Player(pg.sprite.Sprite):
@@ -72,33 +77,56 @@ class Player(pg.sprite.Sprite):
         self.pos = pos # List of 2 numbers
         self.number = index  # p1: 8, p2: 9
         self.state = 0 # -2: dead, +2: empowered
-        self.movdir = 0
+        self.movdir = None # 0: Up, 1: Right, 2: Down, 3: Left, None: None
+        self.movstack = [] # Keeps track of key presses
         self.bomb = None # Set to bomb reference, block more bombs till it blows!!
 
-    def move(self): # 0: None, 1: Up, 2: Right, 3: Down, 4: Left
-        oldpos = self.pos[:]
-        self.pos[0] = (0, 0, 1, 0, -1)[self.movdir]
-        self.pos[1] = (0, -1, 0, 1, 0)[self.movdir]
-        if self.movdir and self.board[tuple(self.pos)].get_tile() not in (0, 3):
-            self.pos[:] = oldpos 
+        self.board[tuple(self.pos)].set_tile(self.number)
+
+    def handle_movement(self, movdir, pressed):
+        if pressed:
+            self.movstack.append(movdir)
+            self.movdir = movdir
+        else:
+            self.movstack.remove(movdir)
+            try:
+                self.movdir = self.movstack[-1]
+            except IndexError:
+                self.movdir = None
 
     def place_bomb(self):
-        if self.bomb is not None and self.state >= 0:
+        if self.bomb is None and self.state >= 0:
             self.bomb = Bomb(self)
 
+    def move(self): 
+        if self.movdir is not None:
+            oldpos = tuple(self.pos)
+            self.pos[0] += (0, 1, 0, -1)[self.movdir]
+            self.pos[1] += (-1, 0, 1, 0)[self.movdir]
+            if self.board[tuple(self.pos)].get_tile() not in (display.TILE_EMPTY, display.TILE_FRUIT):
+                self.pos[:] = oldpos
+            if self.bomb and oldpos == self.bomb.pos:
+                self.board[oldpos].set_tile(4)
+            else:
+                self.board[oldpos].set_tile(0)
+
     def update(self, other):
-        self.move()
-        if self.bomb and self.bomb.timer == 0:
+        if self.bomb and self.bomb.timer == -2:
+            self.board.clear_debris()
             self.bomb = None
+        self.move()
         tile_type = self.board[tuple(self.pos)].get_tile()
-        if self.state < 0:
-            if tile_type == 3:
-                self.state = other.state = 0
-            elif tile_type == 5:
+        if tile_type == display.TILE_BOOM:
+            if self.state < 0:
                 return True
-        elif self.state == 0 and tile_type == 5:
-            other.state = 2
-            self.state = -2
-            self.board.spawn_fruit()
+            if self.state == 0:
+                other.state = 2
+                self.state = -2
+                self.board.spawn_fruit()
+        elif tile_type == display.TILE_FRUIT:
+            if self.state < 0:
+                self.state = other.state = 0
+            elif self.state > 0:
+                self.board.spawn_fruit()
         self.board[tuple(self.pos)].set_tile(self.number + self.state)
         return False

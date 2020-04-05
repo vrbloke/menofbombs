@@ -42,26 +42,25 @@ def play_game():
 
     # INIT STUFF
     pg.init()
-    pg.display.set_caption(f"Men of Bombs: Ghost Trick v{version}")
+    pg.display.set_caption(f"Men of Bombs: Ghost Trick v{__version__}")
     screen = pg.display.set_mode((board_size * square_size, board_size * (square_size + 3)), pg.HWSURFACE | pg.DOUBLEBUF)
 
     background = pg.image.load("sprites/background.png").convert()
     Tile.atlas = pg.image.load("sprites/spriteatlas.png").convert()
-    Tile.atlas.set_colorkey((0, 0, 0))
+    Tile.atlas.set_colorkey(0x000000)
 
-    board = Board(board_size)
+    board = Board(board_size, square_size)
     screen = Window(screen, board, background)
     clock = pg.time.Clock()
     randseed()
 
-    # CREATE ACTORS & VARIABLES
-    p1 = entities.Player([3, 3], board, 8)
-    p2 = entities.Player([7, 7], board, 9)
-    players = (p1, p2)
+    config1 = {pg.K_w: 0, pg.K_d: 1, pg.K_s: 2, pg.K_a: 3}
+    config2 = {pg.K_UP: 0, pg.K_RIGHT: 1, pg.K_DOWN: 2, pg.K_LEFT: 3}
     frame = 0
 
-    config1 = {pg.K_w: 1, pg.K_d: 2, pg.K_s: 3, pg.K_a: 4}
-    config2 = {pg.K_UP: 1, pg.K_RIGHT: 2, pg.K_DOWN: 3, pg.K_LEFT: 4}
+    # CREATE ACTORS & VARIABLES
+    p1 = entities.Player(board, [3, 3], 8)
+    p2 = entities.Player(board, [9, 9], 9)
 
     # GAME LOOP
     running = True
@@ -71,18 +70,18 @@ def play_game():
                 running = False
             elif event.type == pg.KEYDOWN:
                 if event.key in config1:
-                    p1.movdir = config1[event.key]
+                    p1.handle_movement(config1[event.key], True)
                 elif event.key == pg.K_e:
                     p1.place_bomb()
                 elif event.key in config2:
-                    p2.movdir = config2[event.key]
+                    p2.handle_movement(config2[event.key], True)
                 elif event.key == pg.K_l:
                     p2.place_bomb()
             elif event.type == pg.KEYUP:
-                if p1.movdir and event.key in config1:
-                    p1.movdir = 0
-                elif p2.movdir and event.key in config2:
-                    p2.movdir = 0
+                if event.key in config1:
+                    p1.handle_movement(config1[event.key], False)
+                elif event.key in config2:
+                    p2.handle_movement(config2[event.key], False)
 
         if frame == 0:
             # Resolve bomb men

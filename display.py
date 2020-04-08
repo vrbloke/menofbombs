@@ -1,72 +1,111 @@
-import pygame
+from typing import Tuple
+from random import choice
+import pygame as pg
 
-'''
-The Display class should be initialized with an array that corresponds to the game board:
-This array should be filled with numbers: indexes in a list of sprites to draw on the board
-There should also be support for a background image
-Python function calls are pass-by-reference so let's hope to jesus this works the way I feel it should!
+"""
+Pro tips by virtuNat:
+1. Learn how to do proper object-oriented programming.
+2. Always have the documentation of the 3rd party modules you're using open when programming.
+3. Group surfaces and rects associated to the same sprite in the same sprite object.
+4. Use pygame.sprite.Group instances to manage sprite displays.
+5. Minimize the number of pixels blitted per frame.
+6. Annotations are not necessary but help a lot in keeping track of what things are.
+"""
 
-Alternate version for solid colors: Follow same interface!!
-'''
-class Display():
-    def __init__(self, board, sprites, text, bg_image, board_size, square_size):
-        self.board = board  # 2d array, [y][x]
-        self.sprites = sprites  # list, holds sprite images or color 3-tuples: index 0 assumed to mean nothing
-        self.text = text
-        self.bg_image = bg_image  # pygame image, assumed same size as board
-        self.board_size = board_size  # integer
-        self.square_size = square_size  # Integer
-        self.rects = [] # 2d array, [x][y]
+TILE_EMPTY = 0
+TILE_SWALL = 1
+TILE_HWALL = 2
+TILE_FRUIT = 3
+TILE_BOMB = 4
+TILE_BOOM = 5
 
-    def initialize(self):
-        self.screen = pygame.display.set_mode((self.board_size * self.square_size, self.board_size * (self.square_size + 3)))
+class Tile(pg.sprite.Sprite):
+    """Sprite tile on the board. Each tile is its own sprite."""
+    __slots__ = ('image', 'rect', 'clip')
+    atlas = None
 
-        for i in range(self.board_size):
-            new_row = []
-            for j in range(self.board_size):
-                new_rect = pygame.Rect(i * self.square_size, j * self.square_size, self.square_size, self.square_size)
-                new_row.append(new_rect)
-            self.rects.append(new_row)
+    def __init__(self, size: int, x: int, y: int) -> None:
+        super().__init__()
+        self.image = self.atlas
+        self.rect = pg.Rect(x*size, y*size, size, size)
+        self.clip = pg.Rect(0, 0, size, size)
 
-        self.font = pygame.font.SysFont("Arial", 16)
+    def __repr__(self) -> str:
+        return f'Tile({self.rect.w}, {self.rect.x//self.rect.w}, {self.rect.y//self.rect.h})'
 
-    def blit(self):
-        pass
+    def get_pos(self) -> Tuple[int, int]:
+        return (self.rect.x // self.rect.w, self.rect.y // self.rect.h)
 
-    def blit_text(self):
-        self.screen.blit(self.font.render(self.text, True, (255, 255, 255)), (self.board_size * self.square_size, 0))
+    def get_tile(self) -> int:
+        return self.clip.x // self.clip.w
 
-    def draw_bg(self):
-        pass
+    def set_tile(self, index: int) -> None:
+        self.clip.x = index * self.clip.w
 
-    def update(self):
-        self.draw_bg()
-        self.blit()
-        #self.blit_text()
-        pygame.display.flip()
+    def draw(self, dest: pg.Surface) -> None:
+        dest.blit(self.image, self.rect, self.clip)
 
-class SpriteDisplay(Display):
-    def blit(self):
-        for i in range(self.board_size):
-            for j in range(self.board_size):
-                if self.board[i][j] == 0:
-                    pass
+
+class Board(pg.sprite.Group):
+    """
+    Container and handler of Tile sprites.
+    Not the smartest idea to hold a literal grid of sprites but it's something.
+    """
+
+    def __init__(self, bsize: int, ssize: int) -> None:
+        super().__init__()
+        self._tiles = {
+            (x, y): Tile(ssize, x, y) for y in range(bsize) for x in range(bsize)
+            }
+        self.size = bsize
+        self.add(self._tiles.values())
+        self.reset()
+
+    def __getitem__(self, index: Tuple[int, int]) -> Tile:
+        if not isinstance(index, tuple):
+            raise TypeError('board indices must be tuples')
+        return self._tiles.__getitem__(index)
+
+    def reset(self) -> None:
+        # Edges of board wall. Odd numbered tiles also wall.
+        for y in range(self.size):
+            for x in range(self.size):
+                if x == 0 or x == self.size-1 or y == 0 or y == self.size-1:
+                    self._tiles[x, y].set_tile(TILE_HWALL)
+                elif x & 1 or y & 1:
+                    self._tiles[x, y].set_tile(TILE_EMPTY)
                 else:
-                    index = self.board[i][j]
-                    self.screen.blit(self.sprites[index], self.rects[i][j])
+                    self._tiles[x, y].set_tile(TILE_SWALL)
 
-    def draw_bg(self):
-        self.screen.blit(self.bg_image, pygame.Rect(0, 0, 0, 0))
+    def spawn_fruit(self) -> None:
+        sprites = [sprite for sprite in self if sprite.get_tile() == TILE_EMPTY]
+        choice(sprites).set_tile(TILE_FRUIT)
 
-class SolidColorDisplay(Display):
-    def blit(self):
-        for i in range(self.board_size):
-            for j in range(self.board_size):
-                if self.board[i][j] == 0:
-                    pass
-                else:
-                    index = self.board[i][j]
-                    self.screen.fill(self.sprites[index], self.rects[i][j])
+    def clear_debris(self) -> None:
+        for sprite in self._tiles.values():
+            if sprite.get_tile() == TILE_BOOM:
+                sprite.set_tile(TILE_EMPTY)
 
-    def draw_bg(self):
-        self.screen.fill(self.bg_image, pygame.Rect(0, 0, self.board_size*self.square_size, self.board_size*self.square_size))
+    def draw(self, dest: pg.Surface) -> None:
+        # This gets pretty horrendously slow pretty fucking quick.
+        blitfunc = dest.blit
+        for sprite in self._tiles.values():
+            blitfunc(sprite.image, sprite.rect, sprite.clip)
+
+
+class Window(object):
+    """Screen handler object."""
+
+    def __init__(self, screen: pg.Surface, board: Board, bg_image: pg.Surface) -> None:
+        self.screen = screen
+        self.bg_image = bg_image
+        self.board = board
+        self.font = pg.font.SysFont("Arial", 16)
+
+    def blit_text(self, text: str, pos: tuple) -> None:
+        self.screen.blit(self.font.render(text, True, (255, 255, 255)), pos)
+
+    def update(self) -> None:
+        self.screen.blit(self.bg_image, (0, 0))
+        self.board.draw(self.screen)
+        pg.display.flip()
